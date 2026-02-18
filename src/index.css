@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Premium "Vee" Theme: Rose Gold & Charcoal */
+    --background: 0 0% 98%; /* Alabaster White */
+    --foreground: 0 0% 20%; /* Charcoal Gray */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+
+    /* Elegant Rose Color */
+    --primary: 345 35% 52%; /* Old Rose #B35667 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 20% 96%; /* Warm Linen */
+    --secondary-foreground: 345 35% 42%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%; /* Soft Gray */
+
+    --accent: 40 30% 90%; /* Champagne Gold hint */
+    --accent-foreground: 345 35% 52%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 345 35% 52%;
+
+    --radius: 0.3rem; /* Sharper corners for modern look */
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 345 35% 60%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 345 35% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-medium;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-sans {
+    font-family: 'Poppins', sans-serif;
+  }
+  .font-serif {
+    font-family: 'Poppins', sans-serif;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
