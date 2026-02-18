@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 
+// استخدام صور من مصادر خارجية مؤقتاً - يمكنك تغييرها من لوحة الإدارة لاحقاً
 const images = [
-  '/image (3).jpg',
-  '/image (2).jpg',
-  '/image (1).jpg',
+  'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80',
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=80',
+  'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200&q=80',
 ];
 
 const Hero = () => {

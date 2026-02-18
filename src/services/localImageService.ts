@@ -15,7 +15,7 @@ class LocalImageService {
   /**
    * ضغط الصورة بذكاء - يدعم صور كبيرة جداً
    */
-  async compressImage(file: File, maxSizeMB: number = 1, quality: number = 0.85): Promise<File> {
+  async compressImage(file: File, maxSizeMB: number = 0.1, quality: number = 0.6): Promise<File> {
     try {
       const fileSizeMB = file.size / (1024 * 1024);
       
@@ -29,7 +29,7 @@ class LocalImageService {
 
       const options = {
         maxSizeMB,
-        maxWidthOrHeight: 2048, // جودة عالية
+        maxWidthOrHeight: 800, // تقليل الدقة لـ 800px فقط
         useWebWorker: true,
         fileType: 'image/jpeg',
         initialQuality: quality,
@@ -63,20 +63,28 @@ class LocalImageService {
    */
   async uploadImage(
     file: File,
-    maxSizeMB: number = 1,
-    quality: number = 0.85
+    maxSizeMB: number = 0.1, // تقليل الحجم لـ 100KB فقط!
+    quality: number = 0.6 // جودة أقل
   ): Promise<ImageUploadResult> {
     try {
       const originalSizeMB = file.size / (1024 * 1024);
       console.log(`📤 بدء معالجة الصورة: ${file.name} (${originalSizeMB.toFixed(2)}MB)`);
 
-      // ضغط الصورة
+      // ضغط الصورة بشكل قوي جداً
       const compressedFile = await this.compressImage(file, maxSizeMB, quality);
       
       // تحويل إلى Base64
       console.log('🚀 جاري تحويل الصورة...');
       const base64 = await this.convertToBase64(compressedFile);
-      console.log('✅ تم تحويل الصورة بنجاح!');
+      
+      // التحقق من حجم Base64
+      const base64SizeKB = (base64.length * 3) / 4 / 1024;
+      console.log(`✅ حجم الصورة النهائي: ${base64SizeKB.toFixed(2)}KB`);
+      
+      // تحذير إذا كان الحجم كبير
+      if (base64SizeKB > 150) {
+        console.warn(`⚠️ تحذير: حجم الصورة ${base64SizeKB.toFixed(2)}KB - قد يسبب مشاكل مع Firestore`);
+      }
       
       return {
         url: base64,

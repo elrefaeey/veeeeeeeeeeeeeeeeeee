@@ -17,6 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { Product } from '@/hooks/useProducts';
 import { EGYPT_GOVS } from '../lib/egyptGovs';
 import { LocalImageUploader } from '@/components/LocalImageUploader';
+import { localStorageImageService } from '@/services/localStorageImageService';
 
 // الحد الأقصى لحجم الصور (50MB - دعم صور كبيرة)
 const MAX_IMAGE_SIZE_MB = 50;
@@ -37,7 +38,7 @@ const AdminDashboard = () => {
     colors.map(c => ({
       color: c.color || '',
       images: c.images ? c.images : c.image ? [c.image] : [''],
-      available: c.available !== false, // default true
+      available: c.available !== undefined ? c.available : true, // default true
       outOfStock: c.outOfStock || false // default false
     }));
 
@@ -336,19 +337,43 @@ const AdminDashboard = () => {
       return;
     }
     
-    // عرض toast للتحميل
     toast({
       title: 'جاري إضافة المنتج...',
       description: 'يرجى الانتظار',
     });
     
     try {
-      await addDoc(collection(db, 'products'), {
-        ...formData,
+      // تحويل البيانات لـ plain objects باستخدام JSON parse/stringify
+      const dataToSave = JSON.parse(JSON.stringify({
+        name: formData.name,
         price: parseFloat(formData.price),
         category: formData.category,
-        colors: formData.colors.filter(c => c.color && c.images && c.images.length > 0),
-      });
+        type: formData.type || '',
+        sizes: formData.sizes || [],
+        sizesAvailability: (formData.sizesAvailability || []).map(s => ({
+          size: s.size,
+          available: s.available !== false,
+          outOfStock: s.outOfStock || false
+        })),
+        image: formData.image,
+        description: formData.description,
+        colors: (formData.colors || [])
+          .filter(c => c.color && c.images && c.images.length > 0)
+          .map(c => ({
+            color: c.color,
+            images: c.images || [],
+            available: c.available !== false,
+            outOfStock: c.outOfStock || false
+          })),
+        sizeImages: (formData.sizeImages || []).map(s => ({
+          size: s.size,
+          images: s.images || []
+        })),
+        soldOut: formData.soldOut || false,
+        displayOrder: formData.displayOrder !== undefined ? formData.displayOrder : null,
+      }));
+
+      await addDoc(collection(db, 'products'), dataToSave);
       
       toast({
         title: '✅ تم إضافة المنتج بنجاح',
@@ -361,7 +386,7 @@ const AdminDashboard = () => {
       console.error('Error adding product:', error);
       toast({
         title: 'خطأ في إضافة المنتج',
-        description: 'حاول مرة أخرى',
+        description: error instanceof Error ? error.message : 'حاول مرة أخرى',
         variant: 'destructive',
       });
     }
@@ -375,18 +400,72 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const { ...dataToUpdate } = formData;
-      await updateDoc(doc(db, 'products', editingProduct.id), {
-        ...dataToUpdate,
+      // تحويل البيانات لـ plain objects
+      const dataToSave = JSON.parse(JSON.stringify({
+        name: formData.name,
         price: parseFloat(formData.price),
-        category: formData.category, // always a string
-        colors: formData.colors.filter(c => c.color && c.images && c.images.length > 0),
+        category: formData.category,
+        type: formData.type || '',
+        sizes: formData.sizes || [],
+        sizesAvailability: (formData.sizesAvailability || []).map(s => ({
+          size: s.size,
+          available: s.available !== false,
+          outOfStock: s.outOfStock || false
+        })),
+        image: formData.image,
+        description: formData.description,
+        colors: (formData.colors || [])
+          .filter(c => c.color && c.images && c.images.length > 0)
+          .map(c => ({
+            color: c.color,
+            images: c.images || [],
+            available: c.available !== false,
+            outOfStock: c.outOfStock || false
+          })),
+        sizeImages: (formData.sizeImages || []).map(s => ({
+          size: s.size,
+          images: s.images || []
+        })),
+        soldOut: formData.soldOut || false,
+        displayOrder: formData.displayOrder !== undefined ? formData.displayOrder : null,
+      }));
+
+      // التحقق من حجم المنتج
+      const sizeCheck = localStorageImageService.isProductSizeValid(dataToSave);
+      console.log(`📊 حجم المنتج: ${sizeCheck.sizeKB}KB`);
+      
+      if (!sizeCheck.valid) {
+        toast({
+          title: '⚠️ المنتج كبير جداً!',
+          description: `الحجم: ${sizeCheck.sizeKB}KB (الحد الأقصى: 1000KB). قلل عدد الصور أو احذف بعضها.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (sizeCheck.sizeKB > 800) {
+        toast({
+          title: '⚠️ تحذير',
+          description: `حجم المنتج: ${sizeCheck.sizeKB}KB. قريب من الحد الأقصى!`,
+        });
+      }
+
+      await updateDoc(doc(db, 'products', editingProduct.id), dataToSave);
+      
+      toast({
+        title: '✅ تم تحديث المنتج بنجاح',
       });
+      
       resetForm();
       setIsEditModalOpen(false);
       setEditingProduct(null);
     } catch (error) {
       console.error('Error updating product:', error);
+      toast({
+        title: 'خطأ في تحديث المنتج',
+        description: error instanceof Error ? error.message : 'حاول مرة أخرى',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -438,6 +517,115 @@ const AdminDashboard = () => {
         offerEndTime: data.offerEndTime,
       };
     }
+    
+    // دالة لحساب حجم الصورة بالـ KB
+    const getImageSizeKB = (dataUrl: string): number => {
+      if (!dataUrl || !dataUrl.startsWith('data:')) return 0;
+      return (dataUrl.length * 3) / 4 / 1024;
+    };
+    
+    // حذف الصور الكبيرة تلقائياً (أكبر من 80KB)
+    let removedCount = 0;
+    
+    // تنظيف الصورة الرئيسية
+    if (freshProduct.image && getImageSizeKB(freshProduct.image) > 80) {
+      freshProduct.image = '';
+      removedCount++;
+    }
+    
+    // تنظيف صور الألوان
+    if (freshProduct.colors && freshProduct.colors.length > 0) {
+      freshProduct.colors = freshProduct.colors.map(color => {
+        if (color.images && color.images.length > 0) {
+          const filteredImages = color.images.filter(img => {
+            const size = getImageSizeKB(img);
+            if (size > 80) {
+              removedCount++;
+              return false;
+            }
+            return true;
+          });
+          return { ...color, images: filteredImages };
+        }
+        return color;
+      }).filter(color => color.images && color.images.length > 0);
+    }
+    
+    // تنظيف صور المقاسات
+    if (freshProduct.sizeImages && freshProduct.sizeImages.length > 0) {
+      freshProduct.sizeImages = freshProduct.sizeImages.map(sizeImg => {
+        if (sizeImg.images && sizeImg.images.length > 0) {
+          const filteredImages = sizeImg.images.filter(img => {
+            const size = getImageSizeKB(img);
+            if (size > 80) {
+              removedCount++;
+              return false;
+            }
+            return true;
+          });
+          return { ...sizeImg, images: filteredImages };
+        }
+        return sizeImg;
+      }).filter(sizeImg => sizeImg.images && sizeImg.images.length > 0);
+    }
+    
+    // التحقق من الحجم بعد التنظيف
+    const sizeCheck = localStorageImageService.isProductSizeValid(freshProduct);
+    console.log(`📊 حجم المنتج بعد التنظيف: ${sizeCheck.sizeKB}KB`);
+    
+    if (removedCount > 0) {
+      toast({
+        title: `🗑️ تم حذف ${removedCount} صورة قديمة كبيرة`,
+        description: `حجم المنتج الآن: ${sizeCheck.sizeKB}KB`,
+      });
+    }
+    
+    // إذا لسه كبير، نحذف كل حاجة
+    if (sizeCheck.sizeKB > 900) {
+      const confirmDelete = confirm(
+        `⚠️ المنتج لسه كبير جداً (${sizeCheck.sizeKB}KB)!\n\n` +
+        `لازم نحذف كل الصور القديمة عشان تقدر تعدل المنتج.\n\n` +
+        `اضغط OK للمتابعة`
+      );
+      
+      if (confirmDelete) {
+        freshProduct.colors = [];
+        freshProduct.sizeImages = [];
+        freshProduct.image = '';
+        
+        toast({
+          title: '🗑️ تم حذف كل الصور',
+          description: 'ارفع صور جديدة مضغوطة (كل صورة أقل من 50KB)',
+        });
+      } else {
+        return; // إلغاء فتح المودال
+      }
+    }
+    
+    // حفظ التغييرات في Firestore إذا تم حذف صور
+    if (removedCount > 0 || sizeCheck.sizeKB > 900) {
+      try {
+        const cleanData = JSON.parse(JSON.stringify({
+          name: freshProduct.name,
+          price: freshProduct.price,
+          category: freshProduct.category,
+          type: freshProduct.type,
+          sizes: freshProduct.sizes,
+          image: freshProduct.image,
+          description: freshProduct.description,
+          colors: freshProduct.colors,
+          sizeImages: freshProduct.sizeImages,
+          soldOut: freshProduct.soldOut,
+          displayOrder: freshProduct.displayOrder,
+        }));
+        
+        await updateDoc(doc(db, 'products', freshProduct.id), cleanData);
+        console.log('✅ تم حفظ المنتج المنظف في Firestore');
+      } catch (error) {
+        console.error('Error saving cleaned product:', error);
+      }
+    }
+    
     setEditingProduct(freshProduct);
     setFormData({
       name: freshProduct.name,
@@ -504,20 +692,34 @@ const AdminDashboard = () => {
     const endTime = globalOfferEndTime || null;
 
     try {
-      await addDoc(collection(db, 'products'), {
-        ...newOfferForm,
+      // تحويل البيانات لـ plain objects باستخدام JSON parse/stringify
+      const dataToSave = JSON.parse(JSON.stringify({
+        name: newOfferForm.name,
         price,
         offer: true,
         offerDiscount,
         offerEndTime: endTime,
-        category: newOfferForm.category, // Use the selected category
-        type: '', // Default to empty
-        sizes: newOfferForm.sizes,
-        colors: newOfferForm.colors.filter(c => c.color && c.images && c.images.length > 0),
-        sizeImages: newOfferForm.sizeImages,
-        image: newOfferForm.image, // Use the provided image
+        category: newOfferForm.category,
+        type: newOfferForm.type || '',
+        sizes: newOfferForm.sizes || [],
+        colors: (newOfferForm.colors || [])
+          .filter(c => c.color && c.images && c.images.length > 0)
+          .map(c => ({
+            color: c.color,
+            images: c.images || [],
+            available: c.available !== false,
+            outOfStock: c.outOfStock || false
+          })),
+        sizeImages: (newOfferForm.sizeImages || []).map(s => ({
+          size: s.size,
+          images: s.images || []
+        })),
+        image: newOfferForm.image,
         description: newOfferForm.description,
-      });
+      }));
+
+      await addDoc(collection(db, 'products'), dataToSave);
+      
       setIsAddOfferOpen(false);
       setNewOfferForm({
         name: '',
@@ -539,6 +741,7 @@ const AdminDashboard = () => {
       console.error('Error adding new offer product:', err);
       toast({
         title: 'حدث خطأ أثناء إضافة المنتج',
+        description: err instanceof Error ? err.message : 'حاول مرة أخرى',
         variant: 'destructive',
       });
     }
@@ -934,7 +1137,7 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       ))}
-                      <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''] }] }))}>
+                      <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''], available: true, outOfStock: false }] }))}>
                         + إضافة لون جديد
                       </Button>
                     </div>

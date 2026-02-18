@@ -15,7 +15,7 @@ interface LocalImageUploaderProps {
 export const LocalImageUploader: React.FC<LocalImageUploaderProps> = ({
   value,
   onChange,
-  maxSizeMB = 50,
+  maxSizeMB = 5, // جودة عالية!
   allowUrl = true,
   placeholder = 'رابط الصورة أو ارفع صورة',
 }) => {
@@ -28,17 +28,14 @@ export const LocalImageUploader: React.FC<LocalImageUploaderProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // التحقق من نوع الملف
     if (!file.type.startsWith('image/')) {
       alert('يرجى اختيار ملف صورة');
       return;
     }
 
-    // عرض حجم الملف للمستخدم
     const fileSizeMB = file.size / (1024 * 1024);
-    console.log(`حجم الصورة: ${fileSizeMB.toFixed(2)}MB - جاري الضغط والرفع...`);
+    console.log(`حجم الصورة: ${fileSizeMB.toFixed(2)}MB - جاري الرفع...`);
 
-    // السماح بصور حتى 50MB
     if (fileSizeMB > 50) {
       alert('حجم الصورة كبير جداً. الحد الأقصى 50MB');
       return;
@@ -46,8 +43,8 @@ export const LocalImageUploader: React.FC<LocalImageUploaderProps> = ({
 
     setUploading(true);
     try {
-      // ضغط وتحويل الصورة إلى Base64 (هيضغطها لـ 1MB تقريباً)
-      const result = await localImageService.uploadImage(file, 1, 0.85);
+      // ضغط قوي وتحويل لـ Base64
+      const result = await localImageService.uploadImage(file, 0.08, 0.6);
       if (result.success && result.url) {
         onChange(result.url);
         console.log('✓ تم معالجة الصورة بنجاح!');
@@ -91,7 +88,7 @@ export const LocalImageUploader: React.FC<LocalImageUploaderProps> = ({
           className="flex-1 w-full sm:w-auto h-10 text-sm"
         >
           <Upload className="w-4 h-4 mr-2" />
-          {uploading ? 'جاري المعالجة...' : 'رفع صورة من الجهاز'}
+          {uploading ? 'جاري المعالجة...' : 'رفع صورة محلياً'}
         </Button>
 
         <div className="flex gap-2 w-full sm:w-auto">
@@ -170,14 +167,13 @@ export const LocalImageUploader: React.FC<LocalImageUploaderProps> = ({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture={false}
         onChange={handleFileSelect}
         className="hidden"
       />
 
       {/* رسالة توضيحية */}
       <p className="text-xs text-stone-400 leading-relaxed">
-        📸 اختر صورة من الاستوديو - يدعم حتى 50MB - معالجة وضغط تلقائي
+        📸 ضغط ذكي - صورة واحدة لكل منتج - جودة جيدة
       </p>
     </div>
   );
