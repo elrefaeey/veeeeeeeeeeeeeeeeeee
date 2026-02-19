@@ -102,9 +102,19 @@ const Footer = () => {
         </div>
 
         <div className="mt-20 pt-8 border-t border-stone-100 flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">
-            © 2026 VEE Label. All rights reserved.
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">
+              © 2026 VEE Label. All rights reserved.
+            </p>
+            <a
+              href="https://wa.me/201092940685?text=أهلا%20أنا%20جاي%20من%20موقع%20VEE%20ممكن%20التفاصيل"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] uppercase tracking-[0.15em] text-stone-400 hover:text-stone-900 transition-colors group"
+            >
+              Developed by <span className="font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Ahmed Elrefaey</span>
+            </a>
+          </div>
           <button
             onClick={() => navigate('/admin-login')}
             className="text-stone-300 hover:text-stone-900 transition-colors"
