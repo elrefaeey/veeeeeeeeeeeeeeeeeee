@@ -1316,6 +1316,97 @@ const AdminDashboard = () => {
                       </Button>
                     </div>
 
+                    {/* صور المقاسات (اختياري) */}
+                    {formData.sizes.length > 0 && (
+                      <div className="bg-white rounded-xl p-6 shadow-sm border border-stone-200">
+                        <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 bg-pink-500 rounded-full"></span>
+                          صور المقاسات (اختياري)
+                        </h3>
+                        <p className="text-sm text-stone-600 mb-4 bg-pink-50 p-3 rounded-lg border border-pink-200">
+                          💡 يمكنك إضافة صورة توضيحية لكل مقاس (مثال: صورة توضح الطول والعرض)
+                        </p>
+                        <div className="space-y-4">
+                          {formData.sizes.map((size) => {
+                            // البحث عن صور المقاس أو إنشاء كائن جديد
+                            let si = formData.sizeImages.find(img => img.size === size);
+                            if (!si) {
+                              // إضافة المقاس للـ sizeImages إذا لم يكن موجود
+                              si = { size, images: [''] };
+                              setFormData(prev => ({
+                                ...prev,
+                                sizeImages: [...prev.sizeImages, si]
+                              }));
+                            }
+                            
+                            return (
+                              <div key={size} className="bg-gradient-to-br from-white to-pink-50 border-2 border-pink-200 p-5 rounded-xl shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                  <span className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm rounded-lg shadow-md">{size}</span>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <Label className="text-xs font-bold text-pink-700 uppercase tracking-wider">صورة توضيحية للمقاس</Label>
+                                  {si.images.map((img, imgIdx) => (
+                                    <div key={imgIdx} className="bg-white border-2 border-pink-200 p-4 rounded-lg">
+                                      <LocalImageUploader
+                                        value={img}
+                                        onChange={(url) => {
+                                          setFormData(prev => {
+                                            const newSizeImages = [...prev.sizeImages];
+                                            const idx = newSizeImages.findIndex(imgObj => imgObj.size === size);
+                                            if (idx >= 0) {
+                                              newSizeImages[idx].images[imgIdx] = url;
+                                            } else {
+                                              newSizeImages.push({ size, images: [url] });
+                                            }
+                                            return { ...prev, sizeImages: newSizeImages };
+                                          });
+                                        }}
+                                        maxSizeMB={MAX_IMAGE_SIZE_MB}
+                                        allowUrl={true}
+                                        placeholder={`رابط صورة المقاس ${size} (اختياري)`}
+                                      />
+                                      {si.images.length > 1 && (
+                                        <Button type="button" variant="destructive" size="sm" className="w-full mt-2 rounded-lg" onClick={() => {
+                                          setFormData(prev => {
+                                            const newSizeImages = [...prev.sizeImages];
+                                            const idx = newSizeImages.findIndex(imgObj => imgObj.size === size);
+                                            if (idx >= 0) {
+                                              newSizeImages[idx].images.splice(imgIdx, 1);
+                                            }
+                                            return { ...prev, sizeImages: newSizeImages };
+                                          });
+                                        }}>
+                                          <Trash2 className="w-3 h-3 mr-1" />
+                                          حذف الصورة
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <Button type="button" variant="outline" size="sm" className="w-full rounded-lg border-2 border-dashed border-pink-300 hover:border-pink-500 hover:bg-pink-50 transition" onClick={() => {
+                                    setFormData(prev => {
+                                      const newSizeImages = [...prev.sizeImages];
+                                      const idx = newSizeImages.findIndex(imgObj => imgObj.size === size);
+                                      if (idx >= 0) {
+                                        newSizeImages[idx].images.push('');
+                                      } else {
+                                        newSizeImages.push({ size, images: [''] });
+                                      }
+                                      return { ...prev, sizeImages: newSizeImages };
+                                    });
+                                  }}>
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    إضافة صورة أخرى
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* الوصف والإعدادات */}
                     <div className="bg-white rounded-xl p-6 shadow-sm border border-stone-200">
                       <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
