@@ -49,6 +49,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
         const idx = images.indexOf(imgs[0]);
         if (idx !== -1) setImgIdx(idx);
       }
+      
+      // إعادة تعيين المقاس المختار عند تغيير اللون
+      setSelectedSizes(['']);
     }
   }, [selectedColorIdx, product?.id]);
 
@@ -422,77 +425,216 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
             {/* Size Selection */}
             <div className="space-y-4">
               <label className="block text-sm uppercase tracking-widest font-black text-stone-900 text-center">Size</label>
-              {product.sizes.length === 1 ? (
-                <div className="flex justify-center">
-                  <span className="px-8 py-4 bg-stone-900 text-white font-black text-base uppercase tracking-wider shadow-lg">
-                    {product.sizes[0]}
-                  </span>
-                </div>
-              ) : quantity === 1 ? (
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {product.sizes.map((size) => {
-                    const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
-                    const isAvailable = sizeAvail ? sizeAvail.available : true;
-                    const isOutOfStock = sizeAvail?.outOfStock || false;
-                    const isDisabled = !isAvailable || isOutOfStock;
-                    
-                    return (
-                      <button
-                        key={size}
-                        onClick={() => {
-                          if (!isDisabled) {
-                            setSelectedSizes([size]);
-                            setTimeout(() => {
-                              quantityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 50);
+              {(() => {
+                // جمع كل المقاسات من كل الألوان
+                const allSizes = new Set<string>();
+                product.colors?.forEach(color => {
+                  const colorSizes = color.sizes || [];
+                  colorSizes.forEach((sizeObj: any) => {
+                    const size = typeof sizeObj === 'string' ? sizeObj : sizeObj.size;
+                    allSizes.add(size);
+                  });
+                });
+                const sizesArray = Array.from(allSizes);
+                
+                // إذا مافيش مقاسات في الألوان، استخدم المقاسات العامة
+                const displaySizes = sizesArray.length > 0 ? sizesArray : product.sizes;
+                
+                if (displaySizes.length === 1) {
+                  return (
+                    <div className="flex justify-center">
+                      <span className="px-8 py-4 bg-stone-900 text-white font-black text-base uppercase tracking-wider shadow-lg">
+                        {displaySizes[0]}
+                      </span>
+                    </div>
+                  );
+                }
+                
+                if (quantity === 1) {
+                  return (
+                    <div className="flex flex-wrap gap-3 justify-center">
+                      {(() => {
+                        // إذا تم اختيار لون، اعرض المقاسات الخاصة باللون فقط
+                        if (selectedColorIdx !== null && product.colors && product.colors[selectedColorIdx]) {
+                          const selectedColor = product.colors[selectedColorIdx];
+                          const colorSizes = selectedColor.sizes || [];
+                          
+                          // إذا اللون ما عندوش مقاسات محددة، اعرض كل المقاسات
+                          if (colorSizes.length === 0) {
+                            return displaySizes.map((size) => {
+                              const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
+                              const isAvailable = sizeAvail ? sizeAvail.available : true;
+                              const isOutOfStock = sizeAvail?.outOfStock || false;
+                              const isDisabled = !isAvailable || isOutOfStock;
+                              
+                              return (
+                                <button
+                                  key={size}
+                                  onClick={() => {
+                                    if (!isDisabled) {
+                                      setSelectedSizes([size]);
+                                      setTimeout(() => {
+                                        quantityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      }, 50);
+                                    }
+                                  }}
+                                  disabled={isDisabled}
+                                  className={`px-8 py-4 text-base font-black uppercase tracking-widest transition-all border-2 ${
+                                    isDisabled
+                                      ? 'bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed line-through'
+                                      : selectedSizes[0] === size 
+                                        ? 'bg-stone-900 text-white border-stone-900 shadow-lg scale-105' 
+                                        : 'bg-white text-stone-700 border-stone-300 hover:border-stone-900 hover:bg-stone-50'
+                                  }`}
+                                >
+                                  {size} {isOutOfStock ? '(نفذ من المخزون)' : !isAvailable ? '(غير متاح)' : ''}
+                                </button>
+                              );
+                            });
                           }
-                        }}
-                        disabled={isDisabled}
-                        className={`px-8 py-4 text-base font-black uppercase tracking-widest transition-all border-2 ${
-                          isDisabled
-                            ? 'bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed line-through'
-                            : selectedSizes[0] === size 
-                              ? 'bg-stone-900 text-white border-stone-900 shadow-lg scale-105' 
-                              : 'bg-white text-stone-700 border-stone-300 hover:border-stone-900 hover:bg-stone-50'
-                        }`}
-                      >
-                        {size} {isOutOfStock ? '(نفذ من المخزون)' : !isAvailable ? '(غير متاح)' : ''}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {Array.from({ length: quantity }).map((_, idx) => (
-                    <div key={idx} className="flex items-center gap-3 justify-center">
-                      <span className="text-sm text-stone-700 uppercase tracking-wider w-24 font-bold">Piece {idx + 1}:</span>
-                      <select
-                        className="border-2 border-stone-300 px-4 py-3 text-base font-bold bg-white focus:outline-none focus:border-stone-900 uppercase"
-                        value={selectedSizes[idx] || ''}
-                        onChange={e => {
-                          const newSizes = [...selectedSizes];
-                          newSizes[idx] = e.target.value;
-                          setSelectedSizes(newSizes);
-                        }}
-                      >
-                        <option value="">Select size</option>
-                        {product.sizes.map((size, sizeIdx) => {
+                          
+                          // اعرض المقاسات الخاصة باللون المختار
+                          return colorSizes.map((sizeObj: any) => {
+                            const size = typeof sizeObj === 'string' ? sizeObj : sizeObj.size;
+                            const available = typeof sizeObj === 'string' ? true : (sizeObj.available !== false);
+                            const outOfStock = typeof sizeObj === 'string' ? false : (sizeObj.outOfStock || false);
+                            const isDisabled = !available || outOfStock;
+                            
+                            return (
+                              <button
+                                key={size}
+                                onClick={() => {
+                                  if (!isDisabled) {
+                                    setSelectedSizes([size]);
+                                    setTimeout(() => {
+                                      quantityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }, 50);
+                                  }
+                                }}
+                                disabled={isDisabled}
+                                className={`px-8 py-4 text-base font-black uppercase tracking-widest transition-all border-2 ${
+                                  isDisabled
+                                    ? 'bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed line-through'
+                                    : selectedSizes[0] === size 
+                                      ? 'bg-stone-900 text-white border-stone-900 shadow-lg scale-105' 
+                                      : 'bg-white text-stone-700 border-stone-300 hover:border-stone-900 hover:bg-stone-50'
+                                }`}
+                              >
+                                {size} {outOfStock ? '(نفذ من المخزون)' : !available ? '(غير متاح)' : ''}
+                              </button>
+                            );
+                          });
+                        }
+                        
+                        // إذا ما تم اختيار لون، اعرض كل المقاسات
+                        return displaySizes.map((size) => {
                           const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
                           const isAvailable = sizeAvail ? sizeAvail.available : true;
                           const isOutOfStock = sizeAvail?.outOfStock || false;
                           const isDisabled = !isAvailable || isOutOfStock;
                           
                           return (
-                            <option key={size + '-' + sizeIdx} value={size} disabled={isDisabled}>
+                            <button
+                              key={size}
+                              onClick={() => {
+                                if (!isDisabled) {
+                                  setSelectedSizes([size]);
+                                  setTimeout(() => {
+                                    quantityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }, 50);
+                                }
+                              }}
+                              disabled={isDisabled}
+                              className={`px-8 py-4 text-base font-black uppercase tracking-widest transition-all border-2 ${
+                                isDisabled
+                                  ? 'bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed line-through'
+                                  : selectedSizes[0] === size 
+                                    ? 'bg-stone-900 text-white border-stone-900 shadow-lg scale-105' 
+                                    : 'bg-white text-stone-700 border-stone-300 hover:border-stone-900 hover:bg-stone-50'
+                              }`}
+                            >
                               {size} {isOutOfStock ? '(نفذ من المخزون)' : !isAvailable ? '(غير متاح)' : ''}
-                            </option>
+                            </button>
                           );
-                        })}
-                      </select>
+                        });
+                      })()}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+                
+                // Multiple quantity selection
+                return (
+                  <div className="space-y-3">
+                    {Array.from({ length: quantity }).map((_, idx) => (
+                      <div key={idx} className="flex items-center gap-3 justify-center">
+                        <span className="text-sm text-stone-700 uppercase tracking-wider w-24 font-bold">Piece {idx + 1}:</span>
+                        <select
+                          className="border-2 border-stone-300 px-4 py-3 text-base font-bold bg-white focus:outline-none focus:border-stone-900 uppercase"
+                          value={selectedSizes[idx] || ''}
+                          onChange={e => {
+                            const newSizes = [...selectedSizes];
+                            newSizes[idx] = e.target.value;
+                            setSelectedSizes(newSizes);
+                          }}
+                        >
+                          <option value="">Select size</option>
+                          {(() => {
+                            // إذا تم اختيار لون، اعرض المقاسات الخاصة باللون فقط
+                            if (selectedColorIdx !== null && product.colors && product.colors[selectedColorIdx]) {
+                              const selectedColor = product.colors[selectedColorIdx];
+                              const colorSizes = selectedColor.sizes || [];
+                              
+                              // إذا اللون ما عندوش مقاسات محددة، اعرض كل المقاسات
+                              if (colorSizes.length === 0) {
+                                return displaySizes.map((size, sizeIdx) => {
+                                  const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
+                                  const isAvailable = sizeAvail ? sizeAvail.available : true;
+                                  const isOutOfStock = sizeAvail?.outOfStock || false;
+                                  const isDisabled = !isAvailable || isOutOfStock;
+                                  
+                                  return (
+                                    <option key={size + '-' + sizeIdx} value={size} disabled={isDisabled}>
+                                      {size} {isOutOfStock ? '(نفذ من المخزون)' : !isAvailable ? '(غير متاح)' : ''}
+                                    </option>
+                                  );
+                                });
+                              }
+                              
+                              // اعرض المقاسات الخاصة باللون المختار
+                              return colorSizes.map((sizeObj: any, sizeIdx: number) => {
+                                const size = typeof sizeObj === 'string' ? sizeObj : sizeObj.size;
+                                const available = typeof sizeObj === 'string' ? true : (sizeObj.available !== false);
+                                const outOfStock = typeof sizeObj === 'string' ? false : (sizeObj.outOfStock || false);
+                                const isDisabled = !available || outOfStock;
+                                
+                                return (
+                                  <option key={size + '-' + sizeIdx} value={size} disabled={isDisabled}>
+                                    {size} {outOfStock ? '(نفذ من المخزون)' : !available ? '(غير متاح)' : ''}
+                                  </option>
+                                );
+                              });
+                            }
+                            
+                            // إذا ما تم اختيار لون، اعرض كل المقاسات
+                            return displaySizes.map((size, sizeIdx) => {
+                              const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
+                              const isAvailable = sizeAvail ? sizeAvail.available : true;
+                              const isOutOfStock = sizeAvail?.outOfStock || false;
+                              const isDisabled = !isAvailable || isOutOfStock;
+                              
+                              return (
+                                <option key={size + '-' + sizeIdx} value={size} disabled={isDisabled}>
+                                  {size} {isOutOfStock ? '(نفذ من المخزون)' : !isAvailable ? '(غير متاح)' : ''}
+                                </option>
+                              );
+                            });
+                          })()}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Quantity */}
@@ -549,8 +691,28 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                     (product.sizes.length > 1 && selectedSizes.some(size => !size)) ||
                     // تعطيل إذا كان اللون المختار نفذ من المخزون
                     (selectedColorIdx !== null && product.colors[selectedColorIdx]?.outOfStock) ||
-                    // تعطيل إذا كان أي مقاس مختار نفذ من المخزون
+                    // تعطيل إذا كان أي مقاس مختار نفذ من المخزون (من المقاسات الخاصة باللون أو العامة)
                     selectedSizes.some(size => {
+                      if (!size) return false;
+                      
+                      // إذا تم اختيار لون، تحقق من المقاسات الخاصة باللون
+                      if (selectedColorIdx !== null && product.colors[selectedColorIdx]) {
+                        const selectedColor = product.colors[selectedColorIdx];
+                        const colorSizes = selectedColor.sizes || [];
+                        
+                        // إذا اللون عنده مقاسات محددة
+                        if (colorSizes.length > 0) {
+                          const sizeObj = colorSizes.find((s: any) => 
+                            (typeof s === 'string' ? s : s.size) === size
+                          );
+                          if (sizeObj) {
+                            const outOfStock = typeof sizeObj === 'string' ? false : (sizeObj.outOfStock || false);
+                            return outOfStock;
+                          }
+                        }
+                      }
+                      
+                      // تحقق من المقاسات العامة
                       const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
                       return sizeAvail?.outOfStock || false;
                     })

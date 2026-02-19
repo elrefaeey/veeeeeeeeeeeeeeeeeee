@@ -39,7 +39,8 @@ const AdminDashboard = () => {
       color: c.color || '',
       images: c.images ? c.images : c.image ? [c.image] : [''],
       available: c.available !== undefined ? c.available : true, // default true
-      outOfStock: c.outOfStock || false // default false
+      outOfStock: c.outOfStock || false, // default false
+      sizes: c.sizes || [] // المقاسات الخاصة باللون
     }));
 
   // 1. تعديل تهيئة sizeImages في formData و newOfferForm
@@ -58,7 +59,7 @@ const AdminDashboard = () => {
     sizesAvailability: [] as { size: string; available: boolean; outOfStock?: boolean }[],
     image: '',
     description: '',
-    colors: normalizeColors([{ color: '', images: [''], available: true, outOfStock: false }]),
+    colors: normalizeColors([{ color: '', images: [''], available: true, outOfStock: false, sizes: [] }]),
     sizeImages: normalizeSizeImages([]),
     soldOut: false,
     displayOrder: undefined,
@@ -133,7 +134,7 @@ const AdminDashboard = () => {
     sizes: [] as string[],
     image: '',
     description: '',
-    colors: normalizeColors([{ color: '', images: [''], available: true, outOfStock: false }]),
+    colors: normalizeColors([{ color: '', images: [''], available: true, outOfStock: false, sizes: [] }]),
     sizeImages: normalizeSizeImages([]),
     offerDiscount: '',
   });
@@ -154,6 +155,59 @@ const AdminDashboard = () => {
       navigate('/admin-login');
     }
   }, [user, navigate]);
+
+  // تحديث المنتجات القديمة لتتوافق مع النظام الجديد
+  React.useEffect(() => {
+    const migrateOldProducts = async () => {
+      if (!user || products.length === 0) return;
+      
+      let needsUpdate = false;
+      const updates: Promise<void>[] = [];
+      
+      for (const product of products) {
+        // تحقق إذا المنتج محتاج تحديث
+        const hasOldStructure = product.colors && product.colors.some(c => !c.sizes || c.sizes.length === 0);
+        
+        if (hasOldStructure && product.sizes && product.sizes.length > 0) {
+          needsUpdate = true;
+          
+          // تحديث كل لون ليكون عنده نفس المقاسات
+          const updatedColors = (product.colors || []).map(color => ({
+            ...color,
+            sizes: product.sizes.map(size => {
+              const sizeAvail = product.sizesAvailability?.find(sa => sa.size === size);
+              return {
+                size,
+                available: sizeAvail ? sizeAvail.available : true,
+                outOfStock: sizeAvail?.outOfStock || false
+              };
+            })
+          }));
+          
+          const updatePromise = updateDoc(doc(db, 'products', product.id), {
+            colors: updatedColors
+          });
+          
+          updates.push(updatePromise);
+        }
+      }
+      
+      if (needsUpdate && updates.length > 0) {
+        try {
+          await Promise.all(updates);
+          console.log(`✅ تم تحديث ${updates.length} منتج للنظام الجديد`);
+          toast({
+            title: '✅ تم تحديث المنتجات',
+            description: `تم تحديث ${updates.length} منتج للنظام الجديد`,
+          });
+        } catch (error) {
+          console.error('❌ خطأ في تحديث المنتجات:', error);
+        }
+      }
+    };
+    
+    migrateOldProducts();
+  }, [user, products]);
 
   // جلب الطلبات من Firebase
   React.useEffect(() => {
@@ -363,7 +417,12 @@ const AdminDashboard = () => {
             color: c.color,
             images: c.images || [],
             available: c.available !== false,
-            outOfStock: c.outOfStock || false
+            outOfStock: c.outOfStock || false,
+            sizes: (c.sizes || []).map(s => ({
+              size: typeof s === 'string' ? s : s.size,
+              available: typeof s === 'string' ? true : (s.available !== false),
+              outOfStock: typeof s === 'string' ? false : (s.outOfStock || false)
+            }))
           })),
         sizeImages: (formData.sizeImages || []).map(s => ({
           size: s.size,
@@ -420,7 +479,12 @@ const AdminDashboard = () => {
             color: c.color,
             images: c.images || [],
             available: c.available !== false,
-            outOfStock: c.outOfStock || false
+            outOfStock: c.outOfStock || false,
+            sizes: (c.sizes || []).map(s => ({
+              size: typeof s === 'string' ? s : s.size,
+              available: typeof s === 'string' ? true : (s.available !== false),
+              outOfStock: typeof s === 'string' ? false : (s.outOfStock || false)
+            }))
           })),
         sizeImages: (formData.sizeImages || []).map(s => ({
           size: s.size,
@@ -751,24 +815,24 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-stone-50/50">
-      <div className="bg-white border-b border-stone-100 flex items-center min-h-[5rem] py-4 px-4 md:px-8 sticky top-0 z-50">
+      <div className="bg-gradient-to-r from-stone-900 via-stone-800 to-stone-900 border-b border-stone-700 flex items-center min-h-[5rem] py-4 px-4 md:px-8 sticky top-0 z-50 shadow-xl">
         <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-col md:flex-row shadow-none items-center gap-2 md:gap-4 text-center md:text-left">
-            <h1 className="text-xl md:text-2xl font-playfair font-black tracking-[0.2em] md:tracking-[0.3em] text-stone-900 uppercase">VEE ADMIN</h1>
-            <div className="hidden md:block h-4 w-px bg-stone-200 mx-2" />
+            <h1 className="text-xl md:text-2xl font-playfair font-black tracking-[0.2em] md:tracking-[0.3em] text-white uppercase drop-shadow-lg">VEE ADMIN</h1>
+            <div className="hidden md:block h-4 w-px bg-stone-600 mx-2" />
             <span className="text-[9px] md:text-[10px] uppercase tracking-widest text-stone-400 font-bold">{user.email}</span>
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             <button
               onClick={() => navigate('/')}
-              className="text-[9px] md:text-[10px] uppercase tracking-widest text-stone-500 hover:text-stone-900 transition-colors font-bold"
+              className="text-[9px] md:text-[10px] uppercase tracking-widest text-stone-300 hover:text-white transition-colors font-bold"
             >
               View Store
             </button>
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="rounded-none border-stone-200 hover:bg-stone-900 hover:text-white transition-all uppercase tracking-widest text-[9px] md:text-[10px] h-8 md:h-10 px-4 md:px-6"
+              className="rounded-none border-stone-600 bg-transparent text-white hover:bg-white hover:text-stone-900 transition-all uppercase tracking-widest text-[9px] md:text-[10px] h-8 md:h-10 px-4 md:px-6"
             >
               <LogOut className="w-3 h-3 mr-2" />
               Sign Out
@@ -779,24 +843,25 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
         {/* Tabs Navigation */}
-        <div className="flex overflow-x-auto no-scrollbar gap-8 md:gap-12 mb-8 md:mb-16 border-b border-stone-100">
+        <div className="flex overflow-x-auto no-scrollbar gap-8 md:gap-12 mb-8 md:mb-16 border-b-2 border-stone-200">
           {[
-            { id: 'products', label: 'Inventory' },
-            { id: 'offers', label: 'Curation' },
-            { id: 'orders', label: `Orders (${orders.length})` },
-            { id: 'policies', label: 'Policies' }
+            { id: 'products', label: 'Inventory', icon: '📦' },
+            { id: 'offers', label: 'Curation', icon: '✨' },
+            { id: 'orders', label: `Orders (${orders.length})`, icon: '🛍️' },
+            { id: 'policies', label: 'Policies', icon: '📋' }
           ].map((tab) => (
             <button
               key={tab.id}
-              className={`pb-4 text-[10px] md:text-[11px] uppercase tracking-[0.2em] md:tracking-[0.3em] font-black transition-all relative whitespace-nowrap ${activeTab === tab.id
+              className={`pb-4 text-[10px] md:text-[11px] uppercase tracking-[0.2em] md:tracking-[0.3em] font-black transition-all relative whitespace-nowrap flex items-center gap-2 ${activeTab === tab.id
                 ? 'text-stone-900'
-                : 'text-stone-300 hover:text-stone-500'
+                : 'text-stone-400 hover:text-stone-600'
                 }`}
               onClick={() => setActiveTab(tab.id as any)}
             >
+              <span className="text-base">{tab.icon}</span>
               {tab.label}
               {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-stone-900 animate-in fade-in slide-in-from-bottom-1" />
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 to-rose-500 animate-in fade-in slide-in-from-bottom-1 rounded-t-full" />
               )}
             </button>
           ))}
@@ -806,23 +871,23 @@ const AdminDashboard = () => {
         {activeTab === 'products' && (
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <h2 className="text-2xl md:text-3xl font-playfair font-black text-stone-900 uppercase">Inventory</h2>
-                <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-stone-400 font-bold">Manage your collection</p>
+                <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-stone-500 font-bold">Manage your collection • {products.length} items</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <Button
                   onClick={() => navigate('/admin/products-order')}
                   variant="outline"
-                  className="rounded-none h-11 md:h-12 border-stone-300 hover:bg-stone-100 transition tracking-[0.2em] px-6 md:px-8 text-[9px] md:text-[10px] font-black uppercase w-full sm:w-auto"
+                  className="rounded-lg h-11 md:h-12 border-2 border-stone-300 hover:bg-stone-100 transition tracking-[0.2em] px-6 md:px-8 text-[9px] md:text-[10px] font-black uppercase w-full sm:w-auto shadow-sm"
                 >
-                  ترتيب المنتجات
+                  🔄 ترتيب المنتجات
                 </Button>
                 <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                   <DialogTrigger asChild>
                     <Button
                       onClick={() => resetForm()}
-                      className="rounded-none h-11 md:h-12 bg-stone-950 text-white hover:bg-stone-800 transition tracking-[0.2em] px-6 md:px-8 text-[9px] md:text-[10px] font-black uppercase shadow-lg w-full sm:w-auto"
+                      className="rounded-lg h-11 md:h-12 bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600 transition tracking-[0.2em] px-6 md:px-8 text-[9px] md:text-[10px] font-black uppercase shadow-lg hover:shadow-xl w-full sm:w-auto"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       New Piece
@@ -1135,148 +1200,120 @@ const AdminDashboard = () => {
                               + إضافة صورة أخرى
                             </Button>
                           </div>
+
+                          {/* المقاسات الخاصة باللون */}
+                          <div className="mt-4 p-4 bg-white rounded-lg border-2 border-amber-200">
+                            <h4 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                              المقاسات المتاحة لهذا اللون
+                            </h4>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {availableSizes.map(size => {
+                                const colorSizes = c.sizes || [];
+                                const sizeObj = colorSizes.find((s: any) => (typeof s === 'string' ? s : s.size) === size);
+                                const isSelected = !!sizeObj;
+                                
+                                return (
+                                  <button
+                                    type="button"
+                                    key={size}
+                                    className={`px-4 py-2 rounded-lg border-2 font-bold transition-all ${
+                                      isSelected 
+                                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md' 
+                                        : 'bg-white text-stone-700 border-stone-300 hover:border-amber-300'
+                                    }`}
+                                    onClick={() => {
+                                      const newColors = [...formData.colors];
+                                      const colorSizes = newColors[idx].sizes || [];
+                                      
+                                      if (isSelected) {
+                                        // إزالة المقاس
+                                        newColors[idx].sizes = colorSizes.filter((s: any) => 
+                                          (typeof s === 'string' ? s : s.size) !== size
+                                        );
+                                      } else {
+                                        // إضافة المقاس
+                                        newColors[idx].sizes = [...colorSizes, { size, available: true, outOfStock: false }];
+                                      }
+                                      
+                                      setFormData(prev => ({ ...prev, colors: newColors }));
+                                    }}
+                                  >
+                                    {size}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* عرض المقاسات المختارة مع حالتها */}
+                            {(c.sizes || []).length > 0 && (
+                              <div className="space-y-2 mt-3">
+                                <p className="text-xs font-bold text-stone-600 uppercase">حالة المقاسات:</p>
+                                {(c.sizes || []).map((sizeObj: any, sizeIdx: number) => {
+                                  const size = typeof sizeObj === 'string' ? sizeObj : sizeObj.size;
+                                  const available = typeof sizeObj === 'string' ? true : (sizeObj.available !== false);
+                                  const outOfStock = typeof sizeObj === 'string' ? false : (sizeObj.outOfStock || false);
+                                  
+                                  return (
+                                    <div key={sizeIdx} className="flex items-center gap-3 p-2 bg-stone-50 rounded-lg">
+                                      <span className="font-bold text-sm min-w-[50px]">{size}</span>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          id={`color-${idx}-size-${sizeIdx}-available`}
+                                          checked={available}
+                                          onChange={e => {
+                                            const newColors = [...formData.colors];
+                                            const colorSizes = [...(newColors[idx].sizes || [])];
+                                            if (typeof colorSizes[sizeIdx] === 'string') {
+                                              colorSizes[sizeIdx] = { size: colorSizes[sizeIdx], available: e.target.checked, outOfStock: false };
+                                            } else {
+                                              colorSizes[sizeIdx] = { ...colorSizes[sizeIdx], available: e.target.checked };
+                                              if (e.target.checked) {
+                                                colorSizes[sizeIdx].outOfStock = false;
+                                              }
+                                            }
+                                            newColors[idx].sizes = colorSizes;
+                                            setFormData(prev => ({ ...prev, colors: newColors }));
+                                          }}
+                                          className="w-4 h-4 text-green-500 focus:ring-green-500"
+                                        />
+                                        <Label htmlFor={`color-${idx}-size-${sizeIdx}-available`} className="text-xs font-semibold cursor-pointer">متاح</Label>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          id={`color-${idx}-size-${sizeIdx}-outofstock`}
+                                          checked={outOfStock}
+                                          onChange={e => {
+                                            const newColors = [...formData.colors];
+                                            const colorSizes = [...(newColors[idx].sizes || [])];
+                                            if (typeof colorSizes[sizeIdx] === 'string') {
+                                              colorSizes[sizeIdx] = { size: colorSizes[sizeIdx], available: !e.target.checked, outOfStock: e.target.checked };
+                                            } else {
+                                              colorSizes[sizeIdx] = { ...colorSizes[sizeIdx], outOfStock: e.target.checked };
+                                              if (e.target.checked) {
+                                                colorSizes[sizeIdx].available = false;
+                                              }
+                                            }
+                                            newColors[idx].sizes = colorSizes;
+                                            setFormData(prev => ({ ...prev, colors: newColors }));
+                                          }}
+                                          className="w-4 h-4 text-rose-500 focus:ring-rose-500"
+                                        />
+                                        <Label htmlFor={`color-${idx}-size-${sizeIdx}-outofstock`} className="text-xs font-semibold text-rose-600 cursor-pointer">خلص</Label>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
-                      <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''], available: true, outOfStock: false }] }))}>
+                      <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''], available: true, outOfStock: false, sizes: [] }] }))}>
                         + إضافة لون جديد
                       </Button>
-                    </div>
-
-                    {/* المقاسات */}
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-stone-200">
-                      <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-pink-500 rounded-full"></span>
-                        المقاسات المتاحة
-                      </h3>
-                      <div className="flex flex-wrap gap-3 mb-4">
-                        {availableSizes.map(size => (
-                          <button
-                            type="button"
-                            key={size}
-                            className={`px-6 py-3 rounded-xl border-2 font-bold transition-all transform hover:scale-105 ${
-                              formData.sizes.includes(size) 
-                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-lg' 
-                                : 'bg-white text-stone-700 border-stone-300 hover:border-pink-300'
-                            }`}
-                            onClick={() => {
-                              setFormData(prev => {
-                                let newSizes = prev.sizes.includes(size)
-                                  ? prev.sizes.filter(s => s !== size)
-                                  : [...prev.sizes, size];
-                                let newSizeImages = prev.sizeImages.filter(si => newSizes.includes(si.size));
-                                if (!prev.sizes.includes(size)) {
-                                  newSizeImages.push({ size, images: [''] });
-                                }
-                                return { ...prev, sizes: newSizes, sizeImages: newSizeImages };
-                              });
-                            }}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                      {/* حقول صور كل مقاس */}
-                      <div className="space-y-2">
-                        {formData.sizes.map((size) => {
-                          const si = formData.sizeImages.find(img => img.size === size) || { size, images: [''] };
-                          const sizeAvail = formData.sizesAvailability?.find(sa => sa.size === size);
-                          const isAvailable = sizeAvail ? sizeAvail.available : true;
-                          
-                          return (
-                            <div key={size} className="flex flex-col gap-2 border p-2 rounded-md mb-2">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-bold">{size}</span>
-                                <div className="flex items-center gap-2 ml-4">
-                                  <input
-                                    type="checkbox"
-                                    id={`size-available-${size}`}
-                                    checked={isAvailable}
-                                    onChange={e => {
-                                      setFormData(prev => {
-                                        const newAvail = prev.sizesAvailability || prev.sizes.map(s => ({ size: s, available: true, outOfStock: false }));
-                                        const idx = newAvail.findIndex(sa => sa.size === size);
-                                        if (idx >= 0) {
-                                          newAvail[idx].available = e.target.checked;
-                                        } else {
-                                          newAvail.push({ size, available: e.target.checked, outOfStock: false });
-                                        }
-                                        return { ...prev, sizesAvailability: newAvail };
-                                      });
-                                    }}
-                                  />
-                                  <Label htmlFor={`size-available-${size}`} className="text-sm">متاح</Label>
-                                </div>
-                                <div className="flex items-center gap-2 ml-4">
-                                  <input
-                                    type="checkbox"
-                                    id={`size-outofstock-${size}`}
-                                    checked={sizeAvail?.outOfStock || false}
-                                    onChange={e => {
-                                      setFormData(prev => {
-                                        const newAvail = prev.sizesAvailability || prev.sizes.map(s => ({ size: s, available: true, outOfStock: false }));
-                                        const idx = newAvail.findIndex(sa => sa.size === size);
-                                        if (idx >= 0) {
-                                          newAvail[idx].outOfStock = e.target.checked;
-                                        } else {
-                                          newAvail.push({ size, available: true, outOfStock: e.target.checked });
-                                        }
-                                        return { ...prev, sizesAvailability: newAvail };
-                                      });
-                                    }}
-                                  />
-                                  <Label htmlFor={`size-outofstock-${size}`} className="text-sm text-rose-600">نفذ من المخزون</Label>
-                                </div>
-                                <Button type="button" variant="destructive" size="sm" onClick={() => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    sizes: prev.sizes.filter(s => s !== size),
-                                    sizeImages: prev.sizeImages.filter(img => img.size !== size),
-                                    sizesAvailability: prev.sizesAvailability?.filter(sa => sa.size !== size)
-                                  }));
-                                }}>حذف المقاس</Button>
-                              </div>
-                              {si.images.map((img, imgIdx) => (
-                                <div key={imgIdx} className="flex flex-col gap-2 mb-2">
-                                  <LocalImageUploader
-                                    value={img}
-                                    onChange={(url) => {
-                                      const newSizeImages = prev => prev.sizeImages.map(imgObj =>
-                                        imgObj.size === size
-                                          ? { ...imgObj, images: imgObj.images.map((im, i) => i === imgIdx ? url : im) }
-                                          : imgObj
-                                      );
-                                      setFormData(prev => ({ ...prev, sizeImages: newSizeImages(prev) }));
-                                    }}
-                                    maxSizeMB={MAX_IMAGE_SIZE_MB}
-                                    allowUrl={true}
-                                    placeholder={`صورة المقاس (${size}) أو ارفع صورة`}
-                                  />
-                                  {si.images.length > 1 && (
-                                    <Button type="button" variant="destructive" size="sm" onClick={() => {
-                                      const newSizeImages = prev => prev.sizeImages.map(imgObj =>
-                                        imgObj.size === size
-                                          ? { ...imgObj, images: imgObj.images.filter((_, i) => i !== imgIdx) }
-                                          : imgObj
-                                      );
-                                      setFormData(prev => ({ ...prev, sizeImages: newSizeImages(prev) }));
-                                    }}>حذف الصورة</Button>
-                                  )}
-                                </div>
-                              ))}
-                              <Button type="button" variant="outline" size="sm" onClick={() => {
-                                const newSizeImages = prev => prev.sizeImages.map(imgObj =>
-                                  imgObj.size === size
-                                    ? { ...imgObj, images: [...imgObj.images, ''] }
-                                    : imgObj
-                                );
-                                setFormData(prev => ({ ...prev, sizeImages: newSizeImages(prev) }));
-                              }}>
-                                إضافة صورة أخرى
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
                     </div>
 
                     {/* الوصف والإعدادات */}
@@ -1649,9 +1686,118 @@ const AdminDashboard = () => {
                             إضافة صورة أخرى
                           </Button>
                         </div>
+
+                        {/* المقاسات الخاصة باللون */}
+                        <div className="mt-4 p-4 bg-white rounded-lg border-2 border-amber-200">
+                          <h4 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                            المقاسات المتاحة لهذا اللون
+                          </h4>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {availableSizes.map(size => {
+                              const colorSizes = c.sizes || [];
+                              const sizeObj = colorSizes.find((s: any) => (typeof s === 'string' ? s : s.size) === size);
+                              const isSelected = !!sizeObj;
+                              
+                              return (
+                                <button
+                                  type="button"
+                                  key={size}
+                                  className={`px-4 py-2 rounded-lg border-2 font-bold transition-all ${
+                                    isSelected 
+                                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md' 
+                                      : 'bg-white text-stone-700 border-stone-300 hover:border-amber-300'
+                                  }`}
+                                  onClick={() => {
+                                    const newColors = [...formData.colors];
+                                    const colorSizes = newColors[idx].sizes || [];
+                                    
+                                    if (isSelected) {
+                                      // إزالة المقاس
+                                      newColors[idx].sizes = colorSizes.filter((s: any) => 
+                                        (typeof s === 'string' ? s : s.size) !== size
+                                      );
+                                    } else {
+                                      // إضافة المقاس
+                                      newColors[idx].sizes = [...colorSizes, { size, available: true, outOfStock: false }];
+                                    }
+                                    
+                                    setFormData(prev => ({ ...prev, colors: newColors }));
+                                  }}
+                                >
+                                  {size}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* عرض المقاسات المختارة مع حالتها */}
+                          {(c.sizes || []).length > 0 && (
+                            <div className="space-y-2 mt-3">
+                              <p className="text-xs font-bold text-stone-600 uppercase">حالة المقاسات:</p>
+                              {(c.sizes || []).map((sizeObj: any, sizeIdx: number) => {
+                                const size = typeof sizeObj === 'string' ? sizeObj : sizeObj.size;
+                                const available = typeof sizeObj === 'string' ? true : (sizeObj.available !== false);
+                                const outOfStock = typeof sizeObj === 'string' ? false : (sizeObj.outOfStock || false);
+                                
+                                return (
+                                  <div key={sizeIdx} className="flex items-center gap-3 p-2 bg-stone-50 rounded-lg">
+                                    <span className="font-bold text-sm min-w-[50px]">{size}</span>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`edit-color-${idx}-size-${sizeIdx}-available`}
+                                        checked={available}
+                                        onChange={e => {
+                                          const newColors = [...formData.colors];
+                                          const colorSizes = [...(newColors[idx].sizes || [])];
+                                          if (typeof colorSizes[sizeIdx] === 'string') {
+                                            colorSizes[sizeIdx] = { size: colorSizes[sizeIdx], available: e.target.checked, outOfStock: false };
+                                          } else {
+                                            colorSizes[sizeIdx] = { ...colorSizes[sizeIdx], available: e.target.checked };
+                                            if (e.target.checked) {
+                                              colorSizes[sizeIdx].outOfStock = false;
+                                            }
+                                          }
+                                          newColors[idx].sizes = colorSizes;
+                                          setFormData(prev => ({ ...prev, colors: newColors }));
+                                        }}
+                                        className="w-4 h-4 text-green-500 focus:ring-green-500"
+                                      />
+                                      <Label htmlFor={`edit-color-${idx}-size-${sizeIdx}-available`} className="text-xs font-semibold cursor-pointer">متاح</Label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`edit-color-${idx}-size-${sizeIdx}-outofstock`}
+                                        checked={outOfStock}
+                                        onChange={e => {
+                                          const newColors = [...formData.colors];
+                                          const colorSizes = [...(newColors[idx].sizes || [])];
+                                          if (typeof colorSizes[sizeIdx] === 'string') {
+                                            colorSizes[sizeIdx] = { size: colorSizes[sizeIdx], available: !e.target.checked, outOfStock: e.target.checked };
+                                          } else {
+                                            colorSizes[sizeIdx] = { ...colorSizes[sizeIdx], outOfStock: e.target.checked };
+                                            if (e.target.checked) {
+                                              colorSizes[sizeIdx].available = false;
+                                            }
+                                          }
+                                          newColors[idx].sizes = colorSizes;
+                                          setFormData(prev => ({ ...prev, colors: newColors }));
+                                        }}
+                                        className="w-4 h-4 text-rose-500 focus:ring-rose-500"
+                                      />
+                                      <Label htmlFor={`edit-color-${idx}-size-${sizeIdx}-outofstock`} className="text-xs font-semibold text-rose-600 cursor-pointer">خلص</Label>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold shadow-md" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''], available: true, outOfStock: false }] }))}>
+                    <Button type="button" variant="outline" className="w-full rounded-lg border-2 border-dashed border-pink-400 hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white transition font-bold shadow-md" onClick={() => setFormData(prev => ({ ...prev, colors: [...prev.colors, { color: '', images: [''], available: true, outOfStock: false, sizes: [] }] }))}>
                       <Plus className="w-5 h-5 mr-2" />
                       إضافة لون جديد
                     </Button>

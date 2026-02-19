@@ -15,7 +15,14 @@ export interface Product {
   offer?: boolean;
   offerEndTime?: number;
   offerDiscount?: number;
-  colors?: { color: string; image: string; images?: string[]; available?: boolean; outOfStock?: boolean }[];
+  colors?: { 
+    color: string; 
+    image: string; 
+    images?: string[]; 
+    available?: boolean; 
+    outOfStock?: boolean;
+    sizes?: Array<string | { size: string; available: boolean; outOfStock?: boolean }>;
+  }[];
   sizeImages?: { size: string; image: string; images?: string[] }[];
   soldOut?: boolean;
   displayOrder?: number; // ترتيب الظهور
@@ -32,7 +39,8 @@ const normalizeColorsFromFirebase = (colors: any[] = []): Product['colors'] => {
         image: c.images[0], // أول صورة
         images: c.images, // احتفظ بالـ array أيضاً للتوافق
         available: c.available !== false, // default true
-        outOfStock: c.outOfStock || false // default false
+        outOfStock: c.outOfStock || false, // default false
+        sizes: c.sizes || [] // المقاسات الخاصة باللون
       };
     }
     // إذا كان image موجود (الشكل القديم)
@@ -42,7 +50,8 @@ const normalizeColorsFromFirebase = (colors: any[] = []): Product['colors'] => {
         image: c.image,
         images: [c.image],
         available: c.available !== false, // default true
-        outOfStock: c.outOfStock || false // default false
+        outOfStock: c.outOfStock || false, // default false
+        sizes: c.sizes || [] // المقاسات الخاصة باللون
       };
     }
     return null;
